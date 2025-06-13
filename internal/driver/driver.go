@@ -1,9 +1,11 @@
 package driver
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
@@ -184,4 +186,23 @@ func (d *Driver) VolumeDescription() string {
 // Returned value is in format "[<clusterMember>:]<poolName>/<volumeName>".
 func getVolumeID(clusterMember string, poolName string, volName string) string {
 	return fmt.Sprintf("%s:%s/%s", clusterMember, poolName, volName)
+}
+
+// splitVolumeID splits an internal volume ID separated into cluster member name,
+// pool name, and volume name.
+func splitVolumeID(volumeID string) (clusterMember string, poolName string, volName string, err error) {
+	if strings.Contains(volumeID, ":") {
+		clusterMember, volumeID, _ = strings.Cut(volumeID, ":")
+	}
+
+	if volumeID == "" {
+		return "", "", "", errors.New("Volume ID is empty")
+	}
+
+	parts := strings.Split(volumeID, "/")
+	if len(parts) != 2 {
+		return "", "", "", fmt.Errorf("Invalid volume ID %q", volumeID)
+	}
+
+	return clusterMember, parts[0], parts[1], nil
 }

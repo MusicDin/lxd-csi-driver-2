@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/canonical/lxd/lxd/locking"
+	"github.com/canonical/lxd/shared/api"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

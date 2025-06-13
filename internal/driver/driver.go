@@ -1,9 +1,11 @@
 package driver
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
@@ -177,4 +179,19 @@ func (d *Driver) SetNodeServiceCapabilities(caps ...csi.NodeServiceCapability_RP
 // that is managed by the CSI driver.
 func (d *Driver) VolumeDescription() string {
 	return "Managed by " + d.name
+}
+
+// splitVolumeID splits an internal volume ID separated by "/" into a
+// pool name and a volume name.
+func splitVolumeID(volumeID string) (poolName string, volName string, err error) {
+	if volumeID == "" {
+		return "", "", errors.New("Volume ID is empty")
+	}
+
+	parts := strings.Split(volumeID, "/")
+	if len(parts) == 2 {
+		return parts[0], parts[1], nil
+	}
+
+	return "", "", fmt.Errorf("Invalid volume ID %q", volumeID)
 }

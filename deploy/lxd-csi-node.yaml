@@ -52,7 +52,7 @@ spec:
               drop:
                 - ALL
         - name: lxd-csi-node
-          image: ghcr.io/canonical/lxd-csi:0.0.1
+          image: ghcr.io/musicdin/lxd-csi:0.0.1
           imagePullPolicy: Always
           args:
             - "--node-id=$(NODE_NAME)"

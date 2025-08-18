@@ -97,9 +97,10 @@ spec:
                 - ALL
         # CSI controller.
         - name: lxd-csi-controller
-          image: ghcr.io/canonical/lxd-csi:0.0.1
+          image: ghcr.io/musicdin/lxd-csi:0.0.1
           imagePullPolicy: Always
           args:
+            - "-v=2"
             - "--node-id=$(NODE_ID)"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--devlxd-endpoint=$(DEVLXD_ENDPOINT)"

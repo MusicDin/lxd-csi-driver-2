@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/canonical/lxd/lxd/locking"
-	"github.com/canonical/lxd/shared/api"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,7 +15,7 @@ import (
 	"github.com/canonical/lxd/shared/api"
 )
 
-type controllerServer struct {
+type ControllerServer struct {
 	driver *Driver
 
 	// Must be embedded for forward compatibility.
@@ -25,21 +23,21 @@ type controllerServer struct {
 }
 
 // NewControllerServer returns a new instance of the CSI controller server.
-func NewControllerServer(driver *Driver) *controllerServer {
-	return &controllerServer{
+func NewControllerServer(driver *Driver) *ControllerServer {
+	return &ControllerServer{
 		driver: driver,
 	}
 }
 
 // ControllerGetCapabilities returns the capabilities of the controller server.
-func (c *controllerServer) ControllerGetCapabilities(_ context.Context, _ *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
+func (c *ControllerServer) ControllerGetCapabilities(_ context.Context, _ *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	return &csi.ControllerGetCapabilitiesResponse{
 		Capabilities: c.driver.controllerCapabilities,
 	}, nil
 }
 
 // CreateVolume creates a new volume in the LXD storage pool.
-func (c *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (c *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	client := c.driver.devLXD
 
 	volName := req.Name
@@ -206,7 +204,7 @@ func (c *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 }
 
 // DeleteVolume deletes a volume from the LXD storage pool.
-func (c *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+func (c *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	client := c.driver.devLXD
 
 	poolName, volName, err := splitVolumeID(req.VolumeId)
@@ -233,7 +231,7 @@ func (c *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 // ControllerPublishVolume attaches an existing LXD custom volume to a node.
 // If the volume is already attached, the operation is considered successful.
-func (c *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+func (c *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	client := c.driver.devLXD
 
 	poolName, volName, err := splitVolumeID(req.VolumeId)
@@ -303,7 +301,7 @@ func (c *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 
 // ControllerUnpublishVolume detaches LXD custom volume from a node.
 // If the volume is not attached, the operation is considered successful.
-func (c *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+func (c *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	client := c.driver.devLXD
 
 	_, volName, err := splitVolumeID(req.VolumeId)

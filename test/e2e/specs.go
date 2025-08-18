@@ -16,6 +16,129 @@ import (
 	"github.com/onsi/gomega"
 )
 
+// Pod represents a Kubernetes Pod.
+type Pod struct {
+	v1.Pod
+}
+
+// NewPod creates a new Pod definition with the given name, namespace, and image.
+func NewPod(name string, namespace string, image string) *Pod {
+	manifest := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: name + "-",
+			Namespace:    namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "container",
+					Image: image,
+				},
+			},
+		},
+	}
+
+	return &Pod{manifest}
+}
+
+// PrettyName returns the string consisting of Pod's name and namespace.
+func (p *Pod) PrettyName() string {
+	return PrettyName(p.Namespace, p.GenerateName, p.Name)
+}
+
+// WithPVC adds a PersistentVolumeClaim to the Pod's volumes.
+// The path is the mount path inside the container for filesystem volumes
+// and device path inside the container for block volumes.
+func (p *Pod) WithPVC(pvc PersistentVolumeClaim, path string) *Pod {
+	p.Spec.Volumes = append(p.Spec.Volumes, v1.Volume{
+		Name: pvc.Name,
+		VolumeSource: v1.VolumeSource{
+			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+				ClaimName: pvc.Name,
+			},
+		},
+	})
+
+	if len(p.Spec.Containers) > 0 {
+		if pvc.Spec.VolumeMode == nil || *pvc.Spec.VolumeMode == v1.PersistentVolumeFilesystem {
+			// For filesystem volumes, we use the mount path.
+			p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+				Name:      pvc.Name,
+				MountPath: path,
+			})
+		} else {
+			// For block volumes, we use the device path.
+			p.Spec.Containers[0].VolumeDevices = append(p.Spec.Containers[0].VolumeDevices, v1.VolumeDevice{
+				Name:       pvc.Name,
+				DevicePath: path,
+			})
+		}
+	}
+
+	return p
+}
+
+// WithFSVolume adds a PersistentVolumeClaim to the Pod's volumes.
+func (p *Pod) WithFSVolume(persistentVolumeClaimName string, mountPath string) *Pod {
+	p.Spec.Volumes = append(p.Spec.Volumes, v1.Volume{
+		Name: persistentVolumeClaimName,
+		VolumeSource: v1.VolumeSource{
+			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+				ClaimName: persistentVolumeClaimName,
+			},
+		},
+	})
+
+	if len(p.Spec.Containers) > 0 {
+		p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+			Name:      persistentVolumeClaimName,
+			MountPath: mountPath,
+		})
+	}
+
+	return p
+}
+
+// Create creates the Pod in the Kubernetes cluster.
+func (p *Pod) Create(ctx context.Context, client *kubernetes.Clientset) {
+	ginkgo.By("Create Pod " + p.PrettyName())
+	newPod, err := client.CoreV1().Pods(p.Namespace).Create(ctx, &p.Pod, metav1.CreateOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	// Store generated name for future reference.
+	if p.Name == "" {
+		p.Name = newPod.Name
+	}
+}
+
+// Delete deletes the Pod from the Kubernetes cluster.
+func (p *Pod) Delete(ctx context.Context, client *kubernetes.Clientset) {
+	ginkgo.By("Delete Pod " + p.PrettyName())
+	err := client.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+}
+
+// WaitRunning waits until the Pod is in the Running state.
+func (p *Pod) WaitRunning(ctx context.Context, client *kubernetes.Clientset, timeout time.Duration) {
+	ginkgo.By("Wait for Pod " + p.PrettyName() + " to be running")
+	gomega.Eventually(func() bool {
+		pod, err := client.CoreV1().Pods(p.Namespace).Get(ctx, p.Name, metav1.GetOptions{})
+		if err != nil {
+			return false
+		}
+		return pod.Status.Phase == v1.PodRunning
+	}, timeout, time.Second).Should(gomega.BeTrue())
+}
+
+// WaitDeleted waits until the Pod is deleted from the Kubernetes cluster.
+func (p *Pod) WaitDeleted(ctx context.Context, client *kubernetes.Clientset, timeout time.Duration) {
+	ginkgo.By("Wait for Pod " + p.PrettyName() + " to be deleted")
+	gomega.Eventually(func() bool {
+		_, err := client.CoreV1().Pods(p.Namespace).Get(ctx, p.Name, metav1.GetOptions{})
+		return err != nil
+	}, timeout, time.Second).Should(gomega.BeTrue())
+}
+
 // StorageClass represents a Kubernetes StorageClass.
 type StorageClass struct {
 	storagev1.StorageClass

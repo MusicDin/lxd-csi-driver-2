@@ -2,6 +2,8 @@ module github.com/canonical/lxd-csi-driver
 
 go 1.24.5
 
+replace github.com/canonical/lxd => ./lxd
+
 require (
 	github.com/canonical/lxd v0.0.0-20250818084043-b690439a8cfa
 	github.com/container-storage-interface/spec v1.11.0

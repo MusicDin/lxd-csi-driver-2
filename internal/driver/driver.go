@@ -178,3 +178,10 @@ func (d *Driver) SetNodeServiceCapabilities(caps ...csi.NodeServiceCapability_RP
 func (d *Driver) VolumeDescription() string {
 	return "Managed by " + d.name
 }
+
+// getVolumeID constructs a unique volume ID based on the cluster member,
+// storage pool name, and volume name.
+// Returned value is in format "[<clusterMember>:]<poolName>/<volumeName>".
+func getVolumeID(clusterMember string, poolName string, volName string) string {
+	return fmt.Sprintf("%s:%s/%s", clusterMember, poolName, volName)
+}

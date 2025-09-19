@@ -4,8 +4,8 @@ github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPd
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/bmatcuk/doublestar/v4 v4.9.1 h1:X8jg9rRZmJd4yRy7ZeNDRnM+T3ZfHv15JiBJ/avrEXE=
 github.com/bmatcuk/doublestar/v4 v4.9.1/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
-github.com/canonical/lxd v0.0.0-20250916145514-d8634ec03eee h1:YhPhVfMApVMezJoj74I+8d4MoKyIMfw5Y0sW5lbRo+k=
-github.com/canonical/lxd v0.0.0-20250916145514-d8634ec03eee/go.mod h1:NKUO/bh/Yq05xMn9mvKzIbXMCvRsgcfgK0HljMtiKjE=
+github.com/canonical/lxd v0.0.0-20250919070644-8ff732b0aab9 h1:RjUmmWYoy6FbNjrdEo+bNj130mMYZPgJ9kfW09ugBMM=
+github.com/canonical/lxd v0.0.0-20250919070644-8ff732b0aab9/go.mod h1:NKUO/bh/Yq05xMn9mvKzIbXMCvRsgcfgK0HljMtiKjE=
 github.com/container-storage-interface/spec v1.11.0 h1:H/YKTOeUZwHtyPOr9raR+HgFmGluGCklulxDYxSdVNM=
 github.com/container-storage-interface/spec v1.11.0/go.mod h1:DtUvaQszPml1YJfIK7c00mlv6/g4wNMLanLgiUbKFRI=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

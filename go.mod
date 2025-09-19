@@ -3,7 +3,7 @@ module github.com/canonical/lxd-csi-driver
 go 1.24.6
 
 require (
-	github.com/canonical/lxd v0.0.0-20250916145514-d8634ec03eee
+	github.com/canonical/lxd v0.0.0-20250919070644-8ff732b0aab9
 	github.com/container-storage-interface/spec v1.11.0
 	github.com/onsi/ginkgo/v2 v2.25.3
 	github.com/onsi/gomega v1.38.2
@@ -62,6 +62,7 @@ require (
 	github.com/pkg/sftp v1.13.9 // indirect
 	github.com/pkg/xattr v0.4.12 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/zitadel/logging v0.6.2 // indirect
 	github.com/zitadel/oidc/v3 v3.44.0 // indirect

@@ -14,6 +14,7 @@ import (
 	"github.com/canonical/lxd-csi-driver/internal/devlxd"
 	"github.com/canonical/lxd-csi-driver/internal/utils"
 	lxdClient "github.com/canonical/lxd/client"
+	"github.com/canonical/lxd/shared/api"
 )
 
 // driverVersion is the version of the CSI driver.
@@ -83,7 +84,8 @@ type Driver struct {
 	devLXDEndpoint string
 
 	// LXD cluster member where instance is running on.
-	location string
+	location    string
+	isClustered bool
 
 	// gRPC server.
 	server *grpc.Server
@@ -126,8 +128,16 @@ func (d *Driver) Run() error {
 		return fmt.Errorf("Failed to get LXD server info: %v", err)
 	}
 
+	// Fail early if not authenticated.
+	// In addition, this ensures we retrieve actual information whether LXD is clustered or not.
+	// If we are not authenticated, the Environment.ServerClustered field is always false.
+	if info.Auth != api.AuthTrusted {
+		return errors.New("Failed to authenticate with DevLXD server: not tursted")
+	}
+
 	d.devLXD = devLXDClient
 	d.location = info.Location
+	d.isClustered = info.Environment.ServerClustered
 
 	// Construct gRPC unix address.
 	url, socket, err := utils.ParseUnixSocketURL(d.endpoint)
@@ -194,7 +204,13 @@ func (d *Driver) VolumeDescription() string {
 // storage pool name, and volume name.
 // Returned value is in format "[<clusterMember>:]<poolName>/<volumeName>".
 func getVolumeID(clusterMember string, poolName string, volName string) string {
-	return fmt.Sprintf("%s:%s/%s", clusterMember, poolName, volName)
+	volumeID := poolName + "/" + volName
+
+	if clusterMember != "" {
+		volumeID = clusterMember + ":" + volumeID
+	}
+
+	return volumeID
 }
 
 // splitVolumeID splits an internal volume ID separated into cluster member name,

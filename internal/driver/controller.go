@@ -140,8 +140,14 @@ func (c *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		// pod being unschedulable.
 		//
 		// See: https://kubernetes.io/docs/concepts/storage/storage-classes/#volume-binding-mode
-		topologySegments[AnnotationLXDClusterMember] = target
-		client = client.UseTarget(target)
+		if target != "" {
+			topologySegments[AnnotationLXDClusterMember] = target
+
+			// Only set the target when LXD is clustered.
+			if c.driver.isClustered {
+				client = client.UseTarget(target)
+			}
+		}
 	}
 
 	volumeID := getVolumeID(target, poolName, volName)
@@ -204,12 +210,17 @@ func (c *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 // DeleteVolume deletes a volume from the LXD storage pool.
 func (c *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+	client := c.driver.devLXD
+
 	target, poolName, volName, err := splitVolumeID(req.VolumeId)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "DeleteVolume: %v", err)
 	}
 
-	client := c.driver.devLXD.UseTarget(target)
+	// Set target if provided and LXD is clustered.
+	if target != "" && c.driver.isClustered {
+		client = client.UseTarget(target)
+	}
 
 	unlock, err := locking.Lock(ctx, req.VolumeId)
 	if err != nil {
@@ -231,12 +242,17 @@ func (c *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 // ControllerPublishVolume attaches an existing LXD custom volume to a node.
 // If the volume is already attached, the operation is considered successful.
 func (c *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+	client := c.driver.devLXD
+
 	target, poolName, volName, err := splitVolumeID(req.VolumeId)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "ControllerPublishVolume: %v", err)
 	}
 
-	client := c.driver.devLXD.UseTarget(target)
+	// Set target if provided and LXD is clustered.
+	if target != "" && c.driver.isClustered {
+		client = client.UseTarget(target)
+	}
 
 	contentType := ParseContentType(req.VolumeCapability)
 	if contentType == "" {

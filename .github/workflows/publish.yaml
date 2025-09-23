@@ -16,13 +16,13 @@ defaults:
     # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsshell
     shell: bash
 
-env:
-  CONTAINER_REGISTRY: ghcr.io
-
 jobs:
   # Publish container image to GHCR if tests passed and we are on main branch.
   publish:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -38,4 +38,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.CONTAINER_REGISTRY }}/${{ github.repository }}:latest-edge
+          tags: ghcr.io/musicdin/lxd-csi-driver-2:latest-edge

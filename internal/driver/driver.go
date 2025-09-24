@@ -12,7 +12,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/canonical/lxd-csi-driver/internal/devlxd"
-	"github.com/canonical/lxd-csi-driver/internal/utils"
+	"github.com/canonical/lxd-csi-driver/internal/unix"
 	lxdClient "github.com/canonical/lxd/client"
 	"github.com/canonical/lxd/shared/api"
 )
@@ -140,7 +140,7 @@ func (d *Driver) Run() error {
 	d.isClustered = info.Environment.ServerClustered
 
 	// Construct gRPC unix address.
-	url, socket, err := utils.ParseUnixSocketURL(d.endpoint)
+	url, socket, err := unix.ParseUnixSocketURL(d.endpoint)
 	if err != nil {
 		return err
 	}

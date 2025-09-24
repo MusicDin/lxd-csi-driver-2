@@ -6,7 +6,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"github.com/canonical/lxd-csi-driver/internal/utils"
+	"github.com/canonical/lxd-csi-driver/internal/unix"
 	lxdClient "github.com/canonical/lxd/client"
 )
 
@@ -18,7 +18,7 @@ const (
 // Connect establishes a connection to the devLXD server at the specified endpoint.
 func Connect(endpoint string) (lxdClient.DevLXDServer, error) {
 	// Parse and verify devLXD address.
-	_, socket, err := utils.ParseUnixSocketURL(endpoint)
+	_, socket, err := unix.ParseUnixSocketURL(endpoint)
 	if err != nil {
 		return nil, err
 	}

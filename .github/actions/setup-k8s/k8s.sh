@@ -329,30 +329,35 @@ k8sWaitReady() {
         return 1
     fi
 
-    # List nodes and pods on error.
-    trap '
-        kubectl --kubeconfig "${kubeconfigPath}" get nodes
-        kubectl --kubeconfig "${kubeconfigPath}" get pods -A
-        echo "Error: Kubernetes cluster is not ready after ${timeout} seconds!" >&2
-    ' ERR
+    deadline=$((SECONDS + timeout))
+    nodesReady=false
+    podsReady=false
 
-    local deadline=$((SECONDS + timeout))
-    local nodesReady=0
-    local podsReady=0
-
-    echo "===> Waiting for all Kubernetes nodes and pods to be ready ..."
-    while (( SECONDS < deadline )); do
-        [ "${nodesReady}" -eq 0 ] && kubectl --kubeconfig "${kubeconfigPath}" wait --for=condition=Ready nodes --all --timeout=30s && nodesReady=1
-        [ "${podsReady}" -eq 0 ] && kubectl --kubeconfig "${kubeconfigPath}" wait --for=condition=Ready pods  --all -A --timeout=30s && podsReady=1
-
-        if [ "${nodesReady}" -eq 1 ] && [ "${podsReady}" -eq 1 ]; then
+    echo "===> Waiting for nodes to become ready ..."
+    while [ "${SECONDS}" -lt "${deadline}" ]; do
+        if kubectl --kubeconfig "${kubeconfigPath}" wait --for=condition=Ready nodes --all --timeout="10s"; then
+            nodesReady=true
             break
         fi
 
-        sleep 2
+        sleep 1
     done
 
-    if (( SECONDS >= deadline )); then
+    echo "===> Waiting for pods to become ready ..."
+    while [ "${SECONDS}" -lt "${deadline}" ]; do
+        if kubectl --kubeconfig "${kubeconfigPath}" wait --for=condition=Ready pods --all --all-namespaces --timeout="10s"; then
+            podsReady=true
+            break
+        fi
+
+        sleep 1
+    done
+
+    kubectl --kubeconfig "${kubeconfigPath}" get nodes
+    kubectl --kubeconfig "${kubeconfigPath}" get pods --all-namespaces
+
+    if [ "${nodesReady}" = "false" ] || [ "${podsReady}" = "false" ]; then
+        echo "Error: Kubernetes cluster is not ready after ${timeout} seconds!" >&2
         return 1
     fi
 

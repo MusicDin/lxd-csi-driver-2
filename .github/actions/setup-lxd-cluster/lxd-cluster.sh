@@ -190,7 +190,7 @@ EOF
     fi
 
     # Create default managed network (lxdbr0).
-    if ! lxc network show lxdbr0 &>/devl/null; then
+    if ! lxc network show lxdbr0 &>/dev/null; then
         for i in $(seq 1 "${CLUSTER_SIZE}"); do
             instance="${INSTANCE}-${i}"
             lxc exec "${LEADER}" -- lxc network create lxdbr0 --target "${instance}"
@@ -220,6 +220,14 @@ EOF
 # cleanup removes the deployed resources.
 #
 cleanup() {
+    # Switch from cluster remote if necessary.
+    if [ $(lxc remote get-default) = "${CLUSTER_NAME}" ]; then
+        lxc remote switch local || true
+    fi
+
+    # Remove remote.
+    lxc remote rm "${CLUSTER_NAME}" 2>/dev/null || true
+
     # Remove instances.
     for instance in $(lxc list "${CLUSTER_NAME}" --format csv --columns n); do
         echo "Removing instance ${instance} ..."
@@ -237,14 +245,6 @@ cleanup() {
         echo "Removing network ${NETWORK_NAME} ..."
         lxc network delete "${NETWORK_NAME}"
     fi
-
-    # Switch from cluster remote if necessary.
-    if [ $(lxc remote get-default) = "${CLUSTER_NAME}" ]; then
-        lxc remote switch local || true
-    fi
-
-    # Remove remote.
-    lxc remote rm "${CLUSTER_NAME}" 2>/dev/null || true
 }
 
 #================================================
@@ -262,7 +262,7 @@ case "${action}" in
         echo "==> Done: LXD cluster created"
         ;;
     cleanup)
-        echo "==> Removing up LXD cluster ${CLUSTER_NAME}"
+        echo "==> Removing LXD cluster ${CLUSTER_NAME}"
 
         cleanup
 

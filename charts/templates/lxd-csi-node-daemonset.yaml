@@ -53,7 +53,9 @@ spec:
           image: {{ printf "%s:%s" .Values.driver.image.repository ( .Values.driver.image.tag | default .Chart.AppVersion ) }}
           imagePullPolicy: {{ .Values.driver.image.pullPolicy }}
           securityContext:
-            # Privileged is required for bidirectional mount propagation.
+            {{- /*
+              * Privileged is required for bidirectional mount propagation.
+              */}}
             privileged: true
           args:
             - "--node-id=$(NODE_NAME)"

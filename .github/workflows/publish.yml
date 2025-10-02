@@ -61,7 +61,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.CONTAINER_REGISTRY }}/${{ github.repository }}:latest-edge
+          tags: ${{ env.CONTAINER_REGISTRY }}/musicdin/lxd-csi-driver-2:latest-edge
 
       - name: Log in to the Helm registry
         run: |
@@ -76,4 +76,4 @@ jobs:
           set -e
           chartVersion="v0.0.0-latest-edge"
           helm package charts --version "${chartVersion}" --app-version "latest-edge"
-          helm push "lxd-csi-driver-${chartVersion}.tgz" "oci://${{ env.CONTAINER_REGISTRY }}/${{ github.repository }}/chart:${chartVersion}"
+          helm push "lxd-csi-driver-${chartVersion}.tgz" "oci://${{ env.CONTAINER_REGISTRY }}/musicdin/lxd-csi-driver-2/chart:${chartVersion}"

@@ -1,8 +1,6 @@
 name: Publish CSI image
 on:
   push:
-    branches:
-      - main
 
 permissions:
   contents: read

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -166,7 +165,7 @@ func (p Pod) Delete(ctx context.Context) {
 	ginkgo.By("Delete Pod " + p.PrettyName())
 	err := p.delete(ctx, nil)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to delete Pod %q\n%s", p.PrettyName(), p.StateString(ctx))
-	p.WaitGone(ctx, 60*time.Second)
+	p.WaitGone(ctx)
 }
 
 // ForceDelete forcefully deletes the Pod from the Kubernetes cluster.
@@ -283,9 +282,9 @@ func (p *Pod) ReadDevice(ctx context.Context, cfg *rest.Config, device string, n
 }
 
 // WaitReady waits until the Pod is in the Ready state.
-func (p Pod) WaitReady(ctx context.Context, timeout time.Duration) {
+func (p Pod) WaitReady(ctx context.Context) {
 	ginkgo.By("Wait for Pod " + p.PrettyName() + " to be ready")
-	podReady := func() bool {
+	podReady := func(ctx context.Context) bool {
 		state, err := p.State(ctx)
 		if err != nil {
 			return false
@@ -300,13 +299,13 @@ func (p Pod) WaitReady(ctx context.Context, timeout time.Duration) {
 		return false
 	}
 
-	gomega.Eventually(podReady).WithTimeout(timeout).Should(gomega.BeTrue(), "Pod %q is not ready after %s\n%s", p.PrettyName(), timeout, p.StateString(ctx))
+	gomega.Eventually(podReady).WithContext(ctx).Should(gomega.BeTrue(), "Pod %q is not ready\n%s", p.PrettyName(), p.StateString(ctx))
 }
 
 // WaitRunning waits until the Pod is in the Running state.
-func (p Pod) WaitRunning(ctx context.Context, timeout time.Duration) {
+func (p Pod) WaitRunning(ctx context.Context) {
 	ginkgo.By("Wait for Pod " + p.PrettyName() + " to be running")
-	podPhase := func() corev1.PodPhase {
+	podPhase := func(ctx context.Context) corev1.PodPhase {
 		state, err := p.State(ctx)
 		if err != nil {
 			return corev1.PodUnknown
@@ -315,16 +314,16 @@ func (p Pod) WaitRunning(ctx context.Context, timeout time.Duration) {
 		return state.Status.Phase
 	}
 
-	gomega.Eventually(podPhase).WithTimeout(timeout).Should(gomega.Equal(corev1.PodRunning), "Pod %q is not running after %s\n%s", p.PrettyName(), timeout, p.StateString(ctx))
+	gomega.Eventually(podPhase).WithContext(ctx).Should(gomega.Equal(corev1.PodRunning), "Pod %q is not running\n%s", p.PrettyName(), p.StateString(ctx))
 }
 
 // WaitGone waits until the Pod is no longer present in the Kubernetes cluster.
-func (p Pod) WaitGone(ctx context.Context, timeout time.Duration) {
+func (p Pod) WaitGone(ctx context.Context) {
 	ginkgo.By("Wait for Pod " + p.PrettyName() + " to be gone")
-	podGone := func() bool {
+	podGone := func(ctx context.Context) bool {
 		_, err := p.State(ctx)
 		return apierrors.IsNotFound(err)
 	}
 
-	gomega.Eventually(podGone).WithTimeout(timeout).Should(gomega.BeTrue(), "Pod %q is not gone after %s\n%s", p.PrettyName(), timeout, p.StateString(ctx))
+	gomega.Eventually(podGone).WithContext(ctx).Should(gomega.BeTrue(), "Pod %q is not gone\n%s", p.PrettyName(), p.StateString(ctx))
 }

@@ -74,8 +74,7 @@ deploy() {
     # Create container profile capable of running VMs.
     if ! lxc profile show container-kvm &>/dev/null; then
         cat << EOF | lxc profile create container-kvm
-name: ctn-kvm
-description: Container capable of running VMs
+description: Makes containers capable of running VMs
 config:
   linux.kernel_modules: kvm,vhost_net,vhost_vsock
   security.devlxd.images: "true"

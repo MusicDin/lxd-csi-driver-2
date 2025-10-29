@@ -127,6 +127,29 @@ jobWaitAll() {
     logs=()
 }
 
+members=$(lxc cluster ls --format csv | awk -F, '{print $1}' || echo "")
+memberCount=$(echo "${members}" | wc -l)
+
+# lxdMemberByIndex returns the LXD cluster member name for the given index.
+# It uses modulo arithmetic to wrap around if the index exceeds the number of members.
+lxdFindMember() {
+    if [ -z "${members}" ]; then
+        echo ""
+        return
+    fi
+
+    # Trim non-numeric characters from input.
+    local index="${1//[^0-9]/}"
+
+    if [ -z "${index}" ] || ! [[ "${index}" < 1 ]]; then
+        echo "Error: lxdFindMember: Invalid input value '${value}' (index: '${index}'): Index must be a positive number" >&2
+        return 1
+    fi
+
+    index=$(( ((index - 1) % memberCount) + 1))
+    echo "${members}" | sed -n "${index}p"
+}
+
 # lxdProjectCreate creates a new LXD project with the name specified in the environment variable LXD_PROJECT_NAME.
 lxdProjectCreate() {
     local project="${LXD_PROJECT_NAME}"
@@ -141,6 +164,18 @@ lxdNetworkCreate() {
     local network="${LXD_NETWORK_NAME}"
 
     echo "===> Creating LXD network ${network} ..."
+
+    if lxc network show "${network}" &>/dev/null; then
+        echo "SKIP: Network ${network} already exists"
+        return
+    fi
+
+    if [ "${members}" != "" ]; then
+        for member in ${members}; do
+            lxc network create "${network}" --target "${member}"
+        done
+    fi
+
     lxc network create "${network}" ipv4.address=172.16.17.1/24 ipv4.nat=true
 }
 
@@ -149,12 +184,24 @@ lxdStorageCreate() {
     local size="${LXD_STORAGE_POOL_SIZE}"
     local driver="${LXD_STORAGE_POOL_DRIVER}"
 
+    echo "===> Creating LXD storage pool ${pool} (driver: ${driver}) ..."
+    if lxc storage show "${pool}" &>/dev/null; then
+        echo "SKIP: Storage pool ${pool} already exists"
+        return
+    fi
+
     opts=""
     if [ "${size}" != "" ]; then
         opts="size=${size}"
     fi
 
-    echo "===> Creating LXD storage pool ${pool} (driver: ${driver}) ..."
+    if [ "${members}" != "" ]; then
+        for member in ${members}; do
+            lxc storage create "${pool}" "${driver}" --target "${member}" ${opts}
+        done
+        opts=""
+    fi
+
     lxc storage create "${pool}" "${driver}" ${opts}
 }
 
@@ -165,6 +212,7 @@ lxdInstanceCreate() {
     local project="${LXD_PROJECT_NAME}"
     local network="${LXD_NETWORK_NAME}"
     local storage="${LXD_STORAGE_POOL_NAME}"
+    local target="$(lxdFindMember "${instance}")"
 
     if [ -z "${instance}" ]; then
         echo "Usage: lxdInstanceCreate <instance>" >&2
@@ -177,7 +225,7 @@ lxdInstanceCreate() {
     fi
 
     # Create LXD virtual machine.
-    echo "===> Creating LXD instance ${instance} ..."
+    echo "===> Creating LXD instance ${instance} (target: ${target:-none})..."
     lxc launch "${image}" "${instance}" \
         --project "${project}" \
         --network "${network}" \
@@ -186,6 +234,7 @@ lxdInstanceCreate() {
         --config limits.memory=4GB \
         --device root,size=16GiB \
         --config security.devlxd.management.volumes=true \
+        --target "${target}" \
         ${opts}
 }
 

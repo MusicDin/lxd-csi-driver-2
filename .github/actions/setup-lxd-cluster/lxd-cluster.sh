@@ -71,6 +71,33 @@ deploy() {
         lxc storage create "${STORAGE_POOL}" zfs
     fi
 
+    # Create container profile capable of running VMs.
+    if ! lxc profile show container-kvm &>/dev/null; then
+        cat << EOF | lxc profile create container-kvm
+name: ctn-kvm
+description: Container capable of running VMs
+config:
+  linux.kernel_modules: kvm,vhost_net,vhost_vsock
+  security.devlxd.images: "true"
+  security.idmap.isolated: "false"
+  security.nesting: "true"
+devices:
+  kvm:
+    source: /dev/kvm
+    type: unix-char
+  vhost-net:
+    source: /dev/vhost-net
+    type: unix-char
+  vhost-vsock:
+    source: /dev/vhost-vsock
+    type: unix-char
+  vsock:
+    mode: "0666"
+    source: /dev/vsock
+    type: unix-char
+EOF
+    fi
+
     # Setup cluster instances.
     for i in $(seq 1 "${CLUSTER_SIZE}"); do
         instance="${INSTANCE}-${i}"
@@ -92,7 +119,7 @@ deploy() {
         if [ "${INSTANCE_TYPE}" = "virtual-machine" ]; then
             args="--vm"
         else
-            args="-c security.nesting=true"
+            args="--profile container-kvm -c security.nesting=true"
         fi
 
         echo "Creating instance ${instance} ..."

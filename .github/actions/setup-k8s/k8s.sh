@@ -188,7 +188,7 @@ lxdStorageCreate() {
     fi
 
     opts=""
-    if [ "${size}" != "" ]; then
+    if [ "${driver}" != "dir" ] && [ "${size}" != "" ]; then
         opts="size=${size}"
     fi
 

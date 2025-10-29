@@ -139,7 +139,8 @@ lxdFindMember() {
     fi
 
     # Trim non-numeric characters from input.
-    local index="${1//[^0-9]/}"
+    local value="${1}"
+    local index="${value//[^0-9]/}"
 
     if [ -z "${index}" ] || ! [[ "${index}" < 1 ]]; then
         echo "Error: lxdFindMember: Invalid input value '${value}' (index: '${index}'): Index must be a positive number" >&2

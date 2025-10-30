@@ -195,6 +195,11 @@ lxdStorageCreate() {
 
     if [ "${members}" != "" ]; then
         for member in ${members}; do
+            if [ "${driver}" = "zfs" ]; then
+                lxc storage volume create "${poolName}" root --target "${member}"
+                lxc config device add "${instName}" vol1 disk pool="${poolName}" source=root path=/mnt/vol1
+            fi
+
             lxc storage create "${pool}" "${driver}" --target "${member}" ${opts}
         done
         opts=""

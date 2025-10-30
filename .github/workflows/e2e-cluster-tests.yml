@@ -61,8 +61,6 @@ jobs:
 
       - name: Deploy Kubernetes cluster
         uses: ./.github/actions/setup-k8s
-        env:
-          LXD_STORAGE_POOL_DRIVER: dir
         with:
           k8s-cluster-name: ${{ env.K8S_CLUSTER_NAME }}
           k8s-node-count: 2

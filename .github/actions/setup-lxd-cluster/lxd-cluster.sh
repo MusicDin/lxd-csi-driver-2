@@ -68,7 +68,20 @@ deploy() {
     # Create storage pool.
     echo "Creating storage pool ${STORAGE_POOL} ..."
     if ! lxc storage show "${STORAGE_POOL}" &>/dev/null; then
-        lxc storage create "${STORAGE_POOL}" zfs
+        if [ "${STORAGE_DRIVER}" = "zfs" ]; then
+            lxc storage create "${STORAGE_POOL}" zfs volume.zfs.delegate=true
+
+            # XXX: Ensure that the ZFS device is accessible within the nested container.
+            #      Otherwise, the LXD storage pool creation will fail.
+            zfsPerm=$(stat -c '%a' /dev/zfs)
+            if [ $((zfsPerm & 7)) -eq 0 ]; then
+                # It's udev's job to fix the perms but the rule for it ships in
+                # the zfsutils-linux package which might not be installed.
+                chmod 0666 /dev/zfs
+            fi
+        else
+            lxc storage create "${STORAGE_POOL}" "${STORAGE_DRIVER}"
+        fi
     fi
 
     # Create container profile capable of running VMs.
@@ -129,6 +142,14 @@ EOF
             -c limits.cpu=4 \
             -c limits.memory=4GiB \
             $args
+
+        if [ "${INSTANCE_TYPE}" == "container" ]; then
+            # Attach additional disk to each container to allow creating delegated ZFS storage pool
+            # within the cluster.
+            disk="${instance}-disk"
+            lxc storage volume create "${STORAGE_POOL}" "${disk}"
+            lxc config device add "${instance}" "${disk}" disk pool="${STORAGE_POOL}" source="${disk}" path=/mnt/disk
+        fi
     done
 
     # Wait for instances to become ready.
@@ -200,7 +221,11 @@ EOF
     if ! lxc exec "${LEADER}" -- lxc storage show default &>/dev/null; then
         for i in $(seq 1 "${CLUSTER_SIZE}"); do
             instance="${INSTANCE}-${i}"
-            lxc exec "${LEADER}" -- lxc storage create default "${STORAGE_DRIVER}" --target "${instance}"
+            if [ "${STORAGE_DRIVER}" = "zfs" ]; then
+                lxc exec "${LEADER}" -- lxc storage create default "${STORAGE_DRIVER}" --target "${instance}" source="${STORAGE_POOL}/default_${instance}-disk"
+            else
+                lxc exec "${LEADER}" -- lxc storage create default "${STORAGE_DRIVER}" --target "${instance}"
+            fi
         done
 
         lxc exec "${LEADER}" -- lxc storage create default "${STORAGE_DRIVER}"
@@ -262,6 +287,11 @@ cleanup() {
 
     # Remove storage pool.
     if lxc storage show "${STORAGE_POOL}" &>/dev/null; then
+        for vol in $(lxc storage volume list "${STORAGE_POOL}" --format csv --columns n); do
+            echo "Removing storage volume ${vol} ..."
+            lxc storage volume delete "${STORAGE_POOL}" "${vol}" || true
+        done
+
         echo "Removing storage pool ${STORAGE_POOL} ..."
         lxc storage delete "${STORAGE_POOL}"
     fi

@@ -22,6 +22,15 @@ inputs:
 runs:
   using: composite
   steps:
+      # If we the action is run in the repository where the action is located,
+      # we want to build the image from source. Otherwise, we skip the build
+      # and use the image from the public registry.
+    - name: Determine CSI driver image tag
+      if: ${{ github.action_repository == github.repository }}
+      shell: bash
+      run: |
+        echo K8S_CSI_IMAGE_TAG="dev" >> "$GITHUB_ENV"
+
     - name: Deploy Kubernetes cluster
       shell: bash
       env:
@@ -29,6 +38,5 @@ runs:
         K8S_NODE_COUNT: ${{ inputs.k8s-node-count }}
         K8S_SNAP_CHANNEL: ${{ inputs.k8s-snap-channel }}
         K8S_KUBECONFIG_PATH: ${{ inputs.k8s-kubeconfig-path }}
-        K8S_CSI_IMAGE_PATH: lxd-csi-driver.tar
       run: |
         ${{ github.action_path }}/k8s.sh deploy

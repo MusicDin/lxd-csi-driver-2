@@ -30,17 +30,13 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 setEnv() {
-    # Precheck kubectl is installed.
-    if ! command -v kubectl &> /dev/null; then
-        echo "Error: kubectl is not installed. Use 'snap install kubectl --classic' to install it."
-        exit 1
-    fi
-
-    # Precheck lxc is installed.
-    if ! command -v lxc &> /dev/null; then
-        echo "Error: lxc is not installed"
-        exit 1
-    fi
+    # Precheck required binaries are installed.
+    for cmd in kubectl helm lxc; do
+        if ! command -v "${cmd}" &> /dev/null; then
+            echo "Error: ${cmd} is not installed."
+            exit 1
+        fi
+    done
 
     # Precheck that LXD is accessible and trusts us.
     if [ $(lxc query /1.0 | jq -r .auth) != "trusted" ]; then
@@ -59,7 +55,7 @@ setEnv() {
     : "${K8S_NODE_COUNT:=1}"
     : "${K8S_SNAP_CHANNEL:=latest/edge}"
     : "${K8S_KUBECONFIG_PATH:=${ROOT_DIR}/.kube/${K8S_CLUSTER_NAME}.yml}" # Do not use "${HOME}/..." by default to avoid overwriting user's kubeconfig.
-    # K8S_CSI_IMAGE_PATH - Used to import locally built CSI image tarball to all cluster nodes.
+    : "${K8S_CSI_IMAGE_TAG:=latest-edge}"
 
     # LXD instance, storage, and network configuration.
     : "${LXD_INSTANCE_IMAGE:=ubuntu-minimal-daily:24.04}"
@@ -357,20 +353,13 @@ k8sCopyKubeconfig() {
 }
 
 k8sImportImageTarball() {
-    local imagePath="$1"
     local project="${LXD_PROJECT_NAME}"
     local clusterName="${K8S_CLUSTER_NAME}"
 
-    if [ "${imagePath}" = "" ]; then
-        echo "Usage: k8sImportImageTarball <imagePath>" >&2
-        return 1
-    fi
+    # Build CSI driver image tarball.
+    make image-export
 
-    if [ ! -f "${imagePath}" ]; then
-        echo "Error: k8sImportImageTarball: Image path ${imagePath} not found" >&2
-        return 1
-    fi
-
+    # Import the image tarball to all cluster nodes.
     for i in $(seq 1 "${K8S_NODE_COUNT}"); do
         instance="${K8S_CLUSTER_NAME}-node-${i}"
         echo "Importing image ${imagePath} to node ${instance} ..."
@@ -385,7 +374,7 @@ k8sImportImageTarball() {
 # It creates the necessary namespace and applies the deployment manifests.
 installLXDCSIDriver() {
     local kubeconfigPath="${K8S_KUBECONFIG_PATH}"
-    local csiDeployPath="${ROOT_DIR}/deploy"
+    local chartRepo="oci://ghcr.io/canonical/charts/lxd-csi-driver"
     local project="${LXD_PROJECT_NAME}"
     local name="${K8S_CLUSTER_NAME}-lxd-csi"
     local group="${name}-group"
@@ -410,7 +399,22 @@ installLXDCSIDriver() {
     echo "===> Installing LXD CSI driver ..."
     kubectl --kubeconfig "${kubeconfigPath}" create namespace lxd-csi --save-config
     kubectl --kubeconfig "${kubeconfigPath}" create secret generic lxd-csi-secret --namespace lxd-csi --from-literal=token="${token}"
-    kubectl --kubeconfig "${kubeconfigPath}" apply -f "${csiDeployPath}"
+
+    if [ "${K8S_CSI_IMAGE_TAG}" = "dev" ]; then
+        # Build image from source and import it to cluster nodes.
+        k8sImportImageTarball
+
+        # Use local chart from repository.
+        chartRepo="${ROOT_DIR}/charts"
+    fi
+
+    helm install lxd-csi "${chartRepo}" \
+        --kubeconfig "${kubeconfigPath}" \
+        --namespace "${namespace}" \
+        --timeout 120s \
+        --atomic \
+        --wait \
+        --set driver.image.tag=dev
 }
 
 # help prints the usage information for this script.
@@ -467,10 +471,6 @@ case "${cmd}" in
 
         # Copy kubeconfig to host and adjust the server address.
         k8sCopyKubeconfig "${firstNode}" "${K8S_KUBECONFIG_PATH}"
-
-        if [ "${K8S_CSI_IMAGE_PATH:-}" != "" ]; then
-            k8sImportImageTarball "${K8S_CSI_IMAGE_PATH}"
-        fi
 
         # Ensure cluster is ready before installing the CSI driver.
         k8sWaitReady

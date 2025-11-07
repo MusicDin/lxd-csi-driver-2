@@ -55,6 +55,7 @@ setEnv() {
     : "${K8S_NODE_COUNT:=1}"
     : "${K8S_SNAP_CHANNEL:=latest/edge}"
     : "${K8S_KUBECONFIG_PATH:=${ROOT_DIR}/.kube/${K8S_CLUSTER_NAME}.yml}" # Do not use "${HOME}/..." by default to avoid overwriting user's kubeconfig.
+    : "${K8S_CSI_IMAGE_PATH:=}" # Path to the custom LXD CSI driver image to import to cluster nodes.
     : "${K8S_CSI_IMAGE_TAG:=latest-edge}"
 
     # LXD instance, storage, and network configuration.
@@ -356,9 +357,6 @@ k8sImportImageTarball() {
     local project="${LXD_PROJECT_NAME}"
     local clusterName="${K8S_CLUSTER_NAME}"
 
-    # Build CSI driver image tarball.
-    make image-export
-
     # Import the image tarball to all cluster nodes.
     for i in $(seq 1 "${K8S_NODE_COUNT}"); do
         instance="${K8S_CLUSTER_NAME}-node-${i}"
@@ -374,6 +372,7 @@ k8sImportImageTarball() {
 # It creates the necessary namespace and applies the deployment manifests.
 installLXDCSIDriver() {
     local kubeconfigPath="${K8S_KUBECONFIG_PATH}"
+    local imagePath="${K8S_CSI_IMAGE_PATH}"
     local chartRepo="oci://ghcr.io/canonical/charts/lxd-csi-driver"
     local project="${LXD_PROJECT_NAME}"
     local name="${K8S_CLUSTER_NAME}-lxd-csi"
@@ -400,17 +399,19 @@ installLXDCSIDriver() {
     kubectl --kubeconfig "${kubeconfigPath}" create namespace lxd-csi --save-config
     kubectl --kubeconfig "${kubeconfigPath}" create secret generic lxd-csi-secret --namespace lxd-csi --from-literal=token="${token}"
 
-    if [ "${K8S_CSI_IMAGE_TAG}" = "dev" ]; then
+    if [ "${K8S_CSI_IMAGE_PATH}" != "" ]; then
         # Build image from source and import it to cluster nodes.
-        k8sImportImageTarball
+        k8sImportImageTarball "${imagePath}"
+    fi
 
+    if [ "${K8S_CSI_IMAGE_TAG}" = "dev" ]; then
         # Use local chart from repository.
         chartRepo="${ROOT_DIR}/charts"
     fi
 
     helm install lxd-csi "${chartRepo}" \
         --kubeconfig "${kubeconfigPath}" \
-        --namespace "${namespace}" \
+        --namespace lxd-csi \
         --timeout 120s \
         --atomic \
         --wait \
@@ -472,14 +473,16 @@ case "${cmd}" in
         # Copy kubeconfig to host and adjust the server address.
         k8sCopyKubeconfig "${firstNode}" "${K8S_KUBECONFIG_PATH}"
 
-        # Ensure cluster is ready before installing the CSI driver.
+        # Ensure cluster is becomes ready.
         k8sWaitReady
 
-        # Install the LXD CSI driver.
-        installLXDCSIDriver
+        if [ "${K8S_CSI_IMAGE_TAG}" != "" ]; then
+            # Install the LXD CSI driver.
+            installLXDCSIDriver
 
-        # Wait for the CSI to become ready.
-        k8sWaitReady
+            # Wait for the CSI to become ready.
+            k8sWaitReady
+        fi
 
         echo "==> Done"
         echo -e "\nKubernetes cluster:"

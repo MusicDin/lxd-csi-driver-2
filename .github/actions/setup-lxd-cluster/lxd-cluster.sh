@@ -59,10 +59,16 @@ instanceIPv4() {
 
 # deploy deploys instances required for a LXD cluster.
 deploy() {
+    echo "test"
     # Create dedicated network.
-    echo "Creating network ${NETWORK_NAME} ..."
-    if ! lxc network show "${NETWORK_NAME}" &>/dev/null; then
-        lxc network create "${NETWORK_NAME}"
+    if lxc network show lxdbr0 &>/dev/null; then
+        echo "Using default LXD network named 'lxdbr0' ..."
+        NETWORK_NAME="lxdbr0"
+    else
+        if ! lxc network show "${NETWORK_NAME}" &>/dev/null; then
+            echo "Creating network ${NETWORK_NAME} ..."
+            lxc network create "${NETWORK_NAME}"
+        fi
     fi
 
     # Create storage pool.
@@ -255,6 +261,9 @@ EOF
     token=$(lxc exec "${LEADER}" -- lxc config trust add --name host --quiet)
     ipv4=$(instanceIPv4 "${LEADER}")
 
+    # XXX: Add route to cluster network via leader instance.
+    sudo ip route add 172.16.20.0/24 via "${ipv4}"
+
     lxc remote rm "${CLUSTER_NAME}" 2>/dev/null || true
     lxc remote add "${CLUSTER_NAME}" "${ipv4}" --token "${token}"
     lxc remote switch "${CLUSTER_NAME}"
@@ -278,6 +287,12 @@ cleanup() {
 
     # Remove remote.
     lxc remote rm "${CLUSTER_NAME}" 2>/dev/null || true
+
+    # XXX: Remove route to cluster network via leader instance.
+    ipv4=$(instanceIPv4 "${LEADER}")
+    if [ "${ipv4}" != "" ]; then
+        sudo ip route delete 172.16.20.0/24 via "${ipv4}" || true
+    fi
 
     # Remove instances.
     for instance in $(lxc list "${CLUSTER_NAME}" --format csv --columns n); do

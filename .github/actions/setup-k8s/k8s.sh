@@ -174,13 +174,26 @@ lxdNetworkCreate() {
         done
     fi
 
-    lxc network create "${network}" ipv4.address=172.16.17.1/24 ipv4.nat=true
+    lxc network create "${network}" ipv4.address=172.16.20.1/24 ipv4.nat=true
 }
 
 lxdStorageCreate() {
     local pool="${LXD_STORAGE_POOL_NAME}"
     local size="${LXD_STORAGE_POOL_SIZE}"
     local driver="${LXD_STORAGE_POOL_DRIVER}"
+
+    if [ "${members}" != "" ]; then
+        echo "===> LXD is clustered: Using existing storage pool 'default' ..."
+        LXD_STORAGE_POOL_NAME="default"
+
+        if ! lxc storage show "${LXD_STORAGE_POOL_NAME}" &>/dev/null; then
+            echo "Error: When LXD is cluster, a storage pool 'default' is required to exist." >&2
+            exit 1
+        fi
+
+        LXD_STORAGE_POOL_DRIVER=$(lxc storage show "${LXD_STORAGE_POOL_NAME}" | grep driver | awk '{print $2}')
+        return
+    fi
 
     echo "===> Creating LXD storage pool ${pool} (driver: ${driver}) ..."
     if lxc storage show "${pool}" &>/dev/null; then

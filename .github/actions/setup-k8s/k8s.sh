@@ -4,7 +4,7 @@
 # is intended purely for testing LXD CSI driver.
 #
 
-set -euo pipefail
+set -euox pipefail
 
 # Source bin/helpers from canonical/lxd-ci repository.
 source <(
@@ -139,7 +139,7 @@ lxdFindMember() {
     local value="${1}"
     local index="${value//[^0-9]/}"
 
-    if [ -z "${index}" ] || ! [[ "${index}" < 1 ]]; then
+    if [ -z "${index}" ] || [[ "${index}" -lt 1 ]]; then
         echo "Error: lxdFindMember: Invalid input value '${value}' (index: '${index}'): Index must be a positive number" >&2
         return 1
     fi
@@ -289,7 +289,24 @@ k8sInstall() {
     lxc exec "${instance}" --project "${project}" -- apt-get update
     lxc exec "${instance}" --project "${project}" -- apt-get upgrade -y
     lxc exec "${instance}" --project "${project}" -- sh -c "$(declare -f snapdWorkaround); snapdWorkaround"
-    lxc exec "${instance}" --project "${project}" -- snap install k8s --channel="${k8sSnapChannel}" --classic
+
+    # Attempt K8s install multiple times in case of transient network or snap issues.
+    success=false
+    for i in $(seq 1 5); do
+        if lxc exec "${instance}" --project "${project}" -- snap install k8s --channel="${k8sSnapChannel}" --classic; then
+            success=true
+            break
+        fi
+
+        echo "===> ${instance}: Retry installing Canonical Kubernetes (attempt ${i}/5) ..."
+        sleep 3
+    done
+
+
+    if [ "${success}" != "true" ]; then
+        echo "Error: ${instance}: Failed to install Canonical Kubernetes!" >&2
+        return 1
+    fi
 
     # As a convenience, setup alias "k" for kubectl within the instance.
     lxc exec "${instance}" --project "${project}" -- bash -c "echo \"alias k='k8s kubectl'\" >> ~/.bashrc"
@@ -306,7 +323,6 @@ k8sSetupNode() {
         return 1
     fi
 
-    lxdInstanceCreate "${instance}"
     waitInstanceReady "${instance}"
     k8sInstall "${instance}"
 }
@@ -547,6 +563,11 @@ case "${cmd}" in
         # Create LXD instances for Kubernetes nodes.
         for i in $(seq 1 "${K8S_NODE_COUNT}"); do
             instance="${K8S_CLUSTER_NAME}-node-${i}"
+
+            # Create an instance before configuring the node.
+            # This prevents conflicts with image download when LXD is clustered.
+            lxdInstanceCreate "${instance}"
+
             jobRun \
                 "Setup node ${instance}" \
                 k8sSetupNode "${instance}"

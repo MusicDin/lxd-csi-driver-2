@@ -163,15 +163,14 @@ lxdNetworkCreate() {
 
     echo "===> Creating LXD network ${network} ..."
 
-    if lxc network show "${network}" &>/dev/null; then
-        echo "SKIP: Network ${network} already exists"
+    if [ "${members}" != "" ]; then
+        echo "SKIP: Using bridged NIC instead of LXD bridge network"
         return
     fi
 
-    if [ "${members}" != "" ]; then
-        for member in ${members}; do
-            lxc network create "${network}" --target "${member}"
-        done
+    if lxc network show "${network}" &>/dev/null; then
+        echo "SKIP: Network ${network} already exists"
+        return
     fi
 
     lxc network create "${network}" ipv4.address=172.16.20.1/24 ipv4.nat=true
@@ -240,18 +239,33 @@ lxdInstanceCreate() {
         opts="--vm"
     fi
 
+    if [ "${members}" == "" ]; then
+        # When LXD is not clustered, use created bridge network.
+        opts="${opts} --network ${network}"
+    fi
+
     # Create LXD virtual machine.
     echo "===> Creating LXD instance ${instance} (target: ${target:-none})..."
-    lxc launch "${image}" "${instance}" \
+    lxc init "${image}" "${instance}" \
+        --no-profiles \
         --project "${project}" \
-        --network "${network}" \
         --storage "${storage}" \
         --config limits.cpu=4 \
         --config limits.memory=4GB \
-        --device root,size=16GiB \
         --config security.devlxd.management.volumes=true \
+        --device root,size=16GiB \
         --target "${target}" \
         ${opts}
+
+    if [ "${members}" != "" ]; then
+        # When LXD is bridged, expect bridge "br0" to exist.
+        lxc config device add "${instance}" eth0 nic \
+            nictype=bridged \
+            parent=br0 \
+            --project "${project}"
+    fi
+
+    lxc start "${instance}" --project "${project}"
 }
 
 # lxdInstanceIP retrieves the IP address of the specified LXD instance.

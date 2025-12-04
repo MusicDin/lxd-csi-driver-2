@@ -40,6 +40,14 @@ source <(
 instanceIPv4() {
     local instance="$1"
 
+    # Try to get any IPv4 address from preconfigured bridge br0.
+    ipv4=$(lxc ls "${instance}" -f csv -c 4 | grep "(br0)" | awk '{print $1}' || true)
+    if [ "${ipv4}" != "" ]; then
+        echo "${ipv4}"
+        return
+    fi
+
+
     # Try for enp5s0 (VM) and eth0 (container) interfaces.
     for inf in enp5s0 eth0; do
         ipv4=$(lxc ls "${instance}" -f csv -c 4 | grep -oP "(\d{1,3}\.){3}\d{1,3}(?= \(${inf}\))" || true)
@@ -49,7 +57,7 @@ instanceIPv4() {
         fi
     done
 
-    echo "Error: Failed to retrieve IPv4 address for instance ${instance}"
+    echo "Error: Failed to retrieve IPv4 address for instance ${instance}" >&2
     return 1
 }
 
@@ -59,17 +67,16 @@ instanceIPv4() {
 
 # deploy deploys instances required for a LXD cluster.
 deploy() {
-    echo "test"
     # Create dedicated network.
-    if lxc network show lxdbr0 &>/dev/null; then
-        echo "Using default LXD network named 'lxdbr0' ..."
-        NETWORK_NAME="lxdbr0"
-    else
-        if ! lxc network show "${NETWORK_NAME}" &>/dev/null; then
-            echo "Creating network ${NETWORK_NAME} ..."
-            lxc network create "${NETWORK_NAME}"
-        fi
+    # if lxc network show lxdbr0 &>/dev/null; then
+    #     echo "Using default LXD network named 'lxdbr0' ..."
+    #     NETWORK_NAME="lxdbr0"
+    # else
+    if ! lxc network show "${NETWORK_NAME}" &>/dev/null; then
+        echo "Creating network ${NETWORK_NAME} ..."
+        lxc network create "${NETWORK_NAME}" ipv4.address=172.16.20.1/24 ipv4.nat=true
     fi
+    # fi
 
     # Create storage pool.
     echo "Creating storage pool ${STORAGE_POOL} ..."
@@ -133,21 +140,36 @@ EOF
             ;;
         esac
 
-        args=""
+        args="--profile container-kvm -c security.nesting=true"
+        ifName="eth0"
         if [ "${INSTANCE_TYPE}" = "virtual-machine" ]; then
             args="--vm"
-        else
-            args="--profile container-kvm -c security.nesting=true"
+            ifName="enp5s0"
         fi
 
         echo "Creating instance ${instance} ..."
 
-        lxc launch "${INSTANCE_IMAGE}" "${instance}" \
+        lxc init "${INSTANCE_IMAGE}" "${instance}" \
             --storage "${STORAGE_POOL}" \
             --network "${NETWORK_NAME}" \
             -c limits.cpu=4 \
             -c limits.memory=4GiB \
+            -c security.devlxd.images="true" \
             $args
+
+        # Apply network bridge configuration.
+        lxc config set "${instance}" cloud-init.network-config - <<EOF
+version: 2
+ethernets:
+  ${ifName}:
+    dhcp4: false
+bridges:
+  br0:
+    interfaces: [${ifName}]
+    dhcp4: true
+EOF
+
+        lxc start "${instance}"
 
         if [ "${INSTANCE_TYPE}" == "container" ]; then
             # Attach additional disk to each container to allow creating delegated ZFS storage pool
@@ -261,9 +283,6 @@ EOF
     token=$(lxc exec "${LEADER}" -- lxc config trust add --name host --quiet)
     ipv4=$(instanceIPv4 "${LEADER}")
 
-    # XXX: Add route to cluster network via leader instance.
-    sudo ip route add 172.16.20.0/24 via "${ipv4}"
-
     lxc remote rm "${CLUSTER_NAME}" 2>/dev/null || true
     lxc remote add "${CLUSTER_NAME}" "${ipv4}" --token "${token}"
     lxc remote switch "${CLUSTER_NAME}"
@@ -287,12 +306,6 @@ cleanup() {
 
     # Remove remote.
     lxc remote rm "${CLUSTER_NAME}" 2>/dev/null || true
-
-    # XXX: Remove route to cluster network via leader instance.
-    ipv4=$(instanceIPv4 "${LEADER}")
-    if [ "${ipv4}" != "" ]; then
-        sudo ip route delete 172.16.20.0/24 via "${ipv4}" || true
-    fi
 
     # Remove instances.
     for instance in $(lxc list "${CLUSTER_NAME}" --format csv --columns n); do

@@ -27,6 +27,7 @@ jobs:
       matrix:
         storage_driver:
           - dir
+          - zfs
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -84,6 +85,7 @@ jobs:
       - name: Run E2E tests
         env:
           TEST_LXD_STORAGE_DRIVERS: "${{ matrix.storage_driver }}"
+          K8S_KUBECONFIG_PATH: ${{ steps.kubeconfig.outputs.path }}
         run: |
           set -e
           cd test/e2e

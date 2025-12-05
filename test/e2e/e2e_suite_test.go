@@ -178,7 +178,7 @@ var _ = ginkgo.DescribeTableSubtree("[Volume binding mode]", func(driver string)
 		cfg = testutils.GetClientConfig()
 	})
 
-	ginkgo.FIt("Create a volume with binding mode Immediate",
+	ginkgo.It("Create a volume with binding mode Immediate",
 		func(ctx ginkgo.SpecContext) {
 			requiresStandaloneLXD()
 

@@ -72,14 +72,6 @@ func requiresStandaloneLXD() {
 func getTestLXDStorageDrivers() []ginkgo.TableEntry {
 	entries := []ginkgo.TableEntry{}
 
-	// XXX: Currently, the clustered LXD is tested only with the default storage pool.
-	client, server := getLXDClient()
-	if server.Environment.ServerClustered {
-		pool, _, err := client.GetStoragePool(defClusteredStoragePool)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Clustered LXD tests expect storage pool %q to exist: %v", defClusteredStoragePool, err)
-		return append(entries, ginkgo.Entry("Driver "+pool.Driver, pool.Driver))
-	}
-
 	drivers := os.Getenv("TEST_LXD_STORAGE_DRIVERS")
 	if drivers == "" {
 		drivers = "dir"

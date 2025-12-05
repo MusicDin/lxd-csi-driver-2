@@ -1,5 +1,10 @@
 #!/bin/bash
-
+#
+# The script creates and configures a LXD cluster with the specified number of members.
+# It creates a bridge network named "br0", that can be used to interconnect instances
+# running within the cluster. It also creates a storage pool name "default" that can
+# be used for volume provisioning.
+#
 set -e
 
 #================================================

@@ -350,6 +350,8 @@ var _ = ginkgo.DescribeTableSubtree("[Volume read/write]", func(driver string) {
 
 	ginkgo.It("Write and read block volume",
 		func(ctx ginkgo.SpecContext) {
+			requiresStandaloneLXD()
+
 			if driver == "dir" {
 				ginkgo.Skip("Skipping volume expansion test for 'dir' driver, as it does not support volume size")
 			}
@@ -559,6 +561,8 @@ var _ = ginkgo.DescribeTableSubtree("[Volume expansion]", func(driver string) {
 
 	ginkgo.It("Online FS volume expansion",
 		func(ctx ginkgo.SpecContext) {
+			requiresStandaloneLXD()
+
 			if driver == "dir" {
 				ginkgo.Skip("Skipping volume expansion test for 'dir' driver, as it does not support volume size")
 			}
@@ -604,6 +608,8 @@ var _ = ginkgo.DescribeTableSubtree("[Volume expansion]", func(driver string) {
 
 	ginkgo.It("Offline block volume expansion",
 		func(ctx ginkgo.SpecContext) {
+			requiresStandaloneLXD()
+
 			if driver == "dir" {
 				ginkgo.Skip("Skipping volume expansion test for 'dir' driver, as it does not support volume size")
 			}
@@ -642,6 +648,8 @@ var _ = ginkgo.DescribeTableSubtree("[Volume expansion]", func(driver string) {
 
 	ginkgo.It("Fail online block volume expansion and succeed once PVC is detached",
 		func(ctx ginkgo.SpecContext) {
+			requiresStandaloneLXD()
+
 			if driver == "dir" {
 				ginkgo.Skip("Skipping volume expansion test for 'dir' driver, as it does not support volume size")
 			}

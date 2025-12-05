@@ -81,11 +81,11 @@ jobs:
           echo "===> Print pods"
           kubectl get pods -A
 
-      # - name: Run E2E tests
-      #   env:
-      #     TEST_LXD_STORAGE_DRIVERS: "${{ matrix.storage_driver }}"
-      #   run: |
-      #     set -e
-      #     cd test/e2e
-      #     go install github.com/onsi/ginkgo/v2/ginkgo@$(go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
-      #     ginkgo -v --timeout 60m .
+      - name: Run E2E tests
+        env:
+          TEST_LXD_STORAGE_DRIVERS: "${{ matrix.storage_driver }}"
+        run: |
+          set -e
+          cd test/e2e
+          go install github.com/onsi/ginkgo/v2/ginkgo@$(go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
+          ginkgo -v --timeout 60m .

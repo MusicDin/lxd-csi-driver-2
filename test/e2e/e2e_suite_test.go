@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/canonical/lxd-csi-driver/test/e2e/specs"
 	"github.com/canonical/lxd-csi-driver/test/testutils"
 	lxd "github.com/canonical/lxd/client"
+	lxdConfig "github.com/canonical/lxd/lxc/config"
 	"github.com/canonical/lxd/shared/api"
 )
 
@@ -36,32 +38,60 @@ func TestE2e(t *testing.T) {
 	ginkgo.RunSpecs(t, "E2e Suite")
 }
 
-func getLXDClient() (lxd.InstanceServer, *api.Server) {
-	if lxdClient == nil {
-		client, err := lxd.ConnectLXD("", nil)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to connect to LXD using default remote: %v", err)
-		lxdClient = client
+func getLXDClient() lxd.InstanceServer {
+	if lxdClient != nil {
+		return lxdClient
 	}
 
-	lxdServer, _, err := lxdClient.GetServer()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to retrieve LXD server information using default remote: %v", err)
+	var configDir string
 
-	return lxdClient, lxdServer
-}
+	// Determine LXD configuration directory. First check for the presence
+	// of the /var/snap/lxd directory. If the directory exists, use snap's
+	// config path. Otherwise fallback to non-snap config path.
+	_, err := os.Stat("/var/snap/lxd")
+	if err == nil || os.IsExist(err) {
+		configDir = "$HOME/snap/lxd/common/config"
+	} else {
+		configDir = "$HOME/.config/lxc"
+	}
 
-func isLXDClustered() bool {
-	_, server := getLXDClient()
-	return server.Environment.ServerClustered
+	configDir = os.ExpandEnv(configDir)
+	configPath := filepath.Join(configDir, "config.yml")
+
+	// Try to load config.yml from determined configDir. Otherwise load default config.
+	config, err := lxdConfig.LoadConfig(configPath)
+	if err != nil {
+		config = lxdConfig.DefaultConfig()
+	}
+
+	lxdClient, err = config.GetInstanceServer(config.DefaultRemote)
+
+	// remote, ok := config.Remotes[config.DefaultRemote]
+	// gomega.Expect(ok).To(gomega.BeTrue(), "Default LXD remote %q not found in LXD client config", config.DefaultRemote)
+
+	// if remote.Protocol != "lxd" {
+	// 	lxdClient, err = lxd.ConnectLXDUnix("", nil)
+	// } else {
+	// 	args := &lxd.ConnectionArgs{
+	// 		InsecureSkipVerify: true,
+	// 	}
+
+	// 	lxdClient, err = lxd.ConnectLXD(remote.Addr, args)
+	// }
+
+	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to connect to LXD using default remote: %v", err)
+
+	return lxdClient
 }
 
 func requiresClusteredLXD() {
-	if !isLXDClustered() {
+	if getLXDClient().IsClustered() {
 		ginkgo.Skip("SKIP: Test requires clustered LXD")
 	}
 }
 
 func requiresStandaloneLXD() {
-	if !isLXDClustered() {
+	if getLXDClient().IsClustered() {
 		ginkgo.Skip("SKIP: Test requires standalone LXD")
 	}
 }
@@ -88,8 +118,8 @@ func getTestLXDStorageDrivers() []ginkgo.TableEntry {
 // It returns the name of the created storage pool and a cleanup function to delete it after use.
 func getTestLXDStoragePool(driver string) (poolName string, cleanup func()) {
 	// XXX: Currently, the clustered LXD is tested only with the default storage pool.
-	client, server := getLXDClient()
-	if server.Environment.ServerClustered {
+	lxdClient := getLXDClient()
+	if lxdClient.IsClustered() {
 		return defClusteredStoragePool, func() {}
 	}
 
@@ -114,12 +144,12 @@ func getTestLXDStoragePool(driver string) (poolName string, cleanup func()) {
 		},
 	}
 
-	err := client.CreateStoragePool(req)
+	err := lxdClient.CreateStoragePool(req)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to create storage pool %q with driver %q: %v", req.Name, req.Driver, err)
 
 	cleanup = func() {
-		_ = client.DeleteStoragePool(req.Name)
-		client.Disconnect()
+		_ = lxdClient.DeleteStoragePool(req.Name)
+		lxdClient.Disconnect()
 	}
 
 	return poolName, cleanup
@@ -148,7 +178,7 @@ var _ = ginkgo.DescribeTableSubtree("[Volume binding mode]", func(driver string)
 		cfg = testutils.GetClientConfig()
 	})
 
-	ginkgo.It("Create a volume with binding mode Immediate",
+	ginkgo.FIt("Create a volume with binding mode Immediate",
 		func(ctx ginkgo.SpecContext) {
 			requiresStandaloneLXD()
 

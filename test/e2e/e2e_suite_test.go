@@ -19,6 +19,10 @@ import (
 	"github.com/canonical/lxd/shared/api"
 )
 
+var lxdClient lxd.InstanceServer
+
+const defClusteredStoragePool = "default"
+
 func TestE2e(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
 
@@ -32,11 +36,49 @@ func TestE2e(t *testing.T) {
 	ginkgo.RunSpecs(t, "E2e Suite")
 }
 
+func getLXDClient() (lxd.InstanceServer, *api.Server) {
+	if lxdClient == nil {
+		client, err := lxd.ConnectLXD("", nil)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to connect to LXD using default remote: %v", err)
+		lxdClient = client
+	}
+
+	lxdServer, _, err := lxdClient.GetServer()
+	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to retrieve LXD server information using default remote: %v", err)
+
+	return lxdClient, lxdServer
+}
+
+func isLXDClustered() bool {
+	_, server := getLXDClient()
+	return server.Environment.ServerClustered
+}
+
+func requiresClusteredLXD() {
+	if !isLXDClustered() {
+		ginkgo.Skip("SKIP: Test requires clustered LXD")
+	}
+}
+
+func requiresStandaloneLXD() {
+	if !isLXDClustered() {
+		ginkgo.Skip("SKIP: Test requires standalone LXD")
+	}
+}
+
 // getTestLXDStorageDrivers returns the list of LXD storage drivers to be used for testing.
 // It reads the TEST_LXD_STORAGE_DRIVERS environment variable, which should contain a comma-separated
 // list of drivers. If the variable is not set, it defaults to ["dir"].
 func getTestLXDStorageDrivers() []ginkgo.TableEntry {
 	entries := []ginkgo.TableEntry{}
+
+	// XXX: Currently, the clustered LXD is tested only with the default storage pool.
+	client, server := getLXDClient()
+	if server.Environment.ServerClustered {
+		pool, _, err := client.GetStoragePool(defClusteredStoragePool)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Clustered LXD tests expect storage pool %q to exist: %v", defClusteredStoragePool, err)
+		return append(entries, ginkgo.Entry("Driver "+pool.Driver, pool.Driver))
+	}
 
 	drivers := os.Getenv("TEST_LXD_STORAGE_DRIVERS")
 	if drivers == "" {
@@ -53,10 +95,13 @@ func getTestLXDStorageDrivers() []ginkgo.TableEntry {
 // getTestLXDStoragePool creates a new LXD storage pool with the given driver for testing purposes.
 // It returns the name of the created storage pool and a cleanup function to delete it after use.
 func getTestLXDStoragePool(driver string) (poolName string, cleanup func()) {
-	poolName = "lxd-csi-" + driver + "-" + testutils.GenerateStringN(5)
+	// XXX: Currently, the clustered LXD is tested only with the default storage pool.
+	client, server := getLXDClient()
+	if server.Environment.ServerClustered {
+		return defClusteredStoragePool, func() {}
+	}
 
-	client, err := lxd.ConnectLXDUnix("", nil)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to connect to local LXD over Unix socket: %v", err)
+	poolName = "lxd-csi-" + driver + "-" + testutils.GenerateStringN(5)
 
 	config := make(map[string]string)
 	if driver != "dir" {
@@ -77,7 +122,7 @@ func getTestLXDStoragePool(driver string) (poolName string, cleanup func()) {
 		},
 	}
 
-	err = client.CreateStoragePool(req)
+	err := client.CreateStoragePool(req)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to create storage pool %q with driver %q: %v", req.Name, req.Driver, err)
 
 	cleanup = func() {
@@ -113,6 +158,8 @@ var _ = ginkgo.DescribeTableSubtree("[Volume binding mode]", func(driver string)
 
 	ginkgo.It("Create a volume with binding mode Immediate",
 		func(ctx ginkgo.SpecContext) {
+			requiresStandaloneLXD()
+
 			poolName, cleanup := getTestLXDStoragePool(driver)
 			defer cleanup()
 
@@ -389,6 +436,8 @@ var _ = ginkgo.DescribeTableSubtree("[Volume access mode] ", func(driver string)
 
 	ginkgo.It("Create volume with access mode ReadWriteOnce",
 		func(ctx ginkgo.SpecContext) {
+			requiresStandaloneLXD()
+
 			poolName, cleanup := getTestLXDStoragePool(driver)
 			defer cleanup()
 
@@ -428,6 +477,8 @@ var _ = ginkgo.DescribeTableSubtree("[Volume access mode] ", func(driver string)
 
 	ginkgo.It("Create volume with access mode ReadWriteOncePod",
 		func(ctx ginkgo.SpecContext) {
+			requiresStandaloneLXD()
+
 			poolName, cleanup := getTestLXDStoragePool(driver)
 			defer cleanup()
 

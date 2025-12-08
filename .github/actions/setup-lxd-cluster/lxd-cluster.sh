@@ -191,6 +191,7 @@ EOF
         waitInstanceReady "${instance}"
         lxc exec "${instance}" -- systemctl is-system-running --wait
         lxc exec "${instance}" -- sh -c 'usermod -aG lxd "$USER"'
+        lxc exec "${instance}" -- chmod 777 /var/snap/lxd/common/lxd/unix.socket
     done
 
     # Install LXD on VMs.

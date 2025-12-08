@@ -41,6 +41,7 @@ runs:
         sudo lxd waitready --timeout 60
         sudo lxd init --auto --network-port=8443 --network-address=localhost
         sudo chmod 777 /var/snap/lxd/common/lxd/unix.socket
+        sudo usermod -aG lxd "$USER"
 
     - run: ./lxd-cluster.sh deploy
       working-directory: ${{ github.action_path }}

@@ -190,6 +190,7 @@ EOF
         instance="${INSTANCE}-${i}"
         waitInstanceReady "${instance}"
         lxc exec "${instance}" -- systemctl is-system-running --wait
+        lxc exec "${instance}" -- sh -c 'usermod -aG lxd "$USER"'
     done
 
     # Install LXD on VMs.

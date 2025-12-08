@@ -28,7 +28,7 @@ VERSION_LXD="${VERSION_LXD:-latest/edge}"
 INSTANCE="${CLUSTER_NAME}"
 LEADER="${CLUSTER_NAME}-1"
 STORAGE_POOL="${CLUSTER_NAME}-pool"
-STORAGE_DRIVER="dir"
+STORAGE_DRIVER="${STORAGE_DRIVER:-dir}"
 NETWORK_NAME="${CLUSTER_NAME}br0"
 
 # Source bin/helpers from canonical/lxd-ci repository.

@@ -19,6 +19,12 @@ inputs:
   lxd-snap-channel:
     description: Snap channel to use for installing LXD on each cluster member.
     default: latest/edge
+  storage-driver:
+    description: The storage driver to use for default storage pool.
+    default: dir
+    options:
+      - dir
+      - zfs
 
 runs:
   using: composite
@@ -52,3 +58,4 @@ runs:
         INSTANCE_TYPE: ${{ inputs.instance-type }}
         INSTANCE_IMAGE: ubuntu:24.04
         VERSION_LXD: ${{ inputs.lxd-snap-channel }}
+        STORAGE_DRIVER: ${{ inputs.storage-driver }}

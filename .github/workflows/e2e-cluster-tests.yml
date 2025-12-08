@@ -56,6 +56,7 @@ jobs:
         with:
           cluster-name: cls
           cluster-size: 2
+          storage-driver: ${{ matrix.storage_driver }}
           instance-type: container # Use containers for faster startup.
 
       - name: Set Kubeconfig path

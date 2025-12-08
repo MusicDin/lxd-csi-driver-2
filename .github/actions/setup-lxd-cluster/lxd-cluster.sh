@@ -190,8 +190,6 @@ EOF
         instance="${INSTANCE}-${i}"
         waitInstanceReady "${instance}"
         lxc exec "${instance}" -- systemctl is-system-running --wait
-        lxc exec "${instance}" -- sh -c 'usermod -aG lxd "$USER"'
-        lxc exec "${instance}" -- chmod 777 /var/snap/lxd/common/lxd/unix.socket
     done
 
     # Install LXD on VMs.
@@ -206,6 +204,8 @@ EOF
 
         # Install LXD snap.
         lxc exec "${instance}" -- snap install lxd --channel "${VERSION_LXD}" || lxc exec "${instance}" -- snap refresh lxd --channel "${VERSION_LXD}"
+        lxc exec "${instance}" -- sh -c 'usermod -aG lxd "$USER"'
+        lxc exec "${instance}" -- chmod 777 /var/snap/lxd/common/lxd/unix.socket
     done
 
     echo "Cluster instances created."

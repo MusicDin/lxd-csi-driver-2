@@ -95,7 +95,7 @@ deploy() {
             if [ $((zfsPerm & 7)) -eq 0 ]; then
                 # It's udev's job to fix the perms but the rule for it ships in
                 # the zfsutils-linux package which might not be installed.
-                chmod 0666 /dev/zfs
+                sudo chmod 0660 /dev/zfs
             fi
         else
             lxc storage create "${STORAGE_POOL}" "${STORAGE_DRIVER}"

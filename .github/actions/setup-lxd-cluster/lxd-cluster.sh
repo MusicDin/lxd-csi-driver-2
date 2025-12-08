@@ -145,7 +145,7 @@ EOF
             ;;
         esac
 
-        args="--profile container-kvm -c security.nesting=true"
+        args="--profile container-kvm --config security.nesting=true"
         ifName="eth0"
         if [ "${INSTANCE_TYPE}" = "virtual-machine" ]; then
             args="--vm"
@@ -157,10 +157,10 @@ EOF
         lxc init "${INSTANCE_IMAGE}" "${instance}" \
             --storage "${STORAGE_POOL}" \
             --network "${NETWORK_NAME}" \
-            -c limits.cpu=4 \
-            -c limits.memory=4GiB \
-            -c security.devlxd.images="true" \
-            $args
+            --config limits.cpu=4 \
+            --config limits.memory=4GiB \
+            --config security.devlxd.images="true" \
+            $args > /dev/null # Ignore output
 
         # Apply network bridge configuration.
         lxc config set "${instance}" cloud-init.network-config - <<EOF
@@ -176,7 +176,7 @@ EOF
 
         lxc start "${instance}"
 
-        if [ "${INSTANCE_TYPE}" == "container" ]; then
+        if [ "${STORAGE_DRIVER}" = "zfs" ] && [ "${INSTANCE_TYPE}" = "container" ]; then
             # Attach additional disk to each container to allow creating delegated ZFS storage pool
             # within the cluster.
             disk="${instance}-disk"
@@ -256,23 +256,17 @@ EOF
     if ! lxc exec "${LEADER}" -- lxc storage show default &>/dev/null; then
         for i in $(seq 1 "${CLUSTER_SIZE}"); do
             instance="${INSTANCE}-${i}"
+
+            opts=""
             if [ "${STORAGE_DRIVER}" = "zfs" ]; then
-                lxc exec "${LEADER}" -- lxc storage create default "${STORAGE_DRIVER}" --target "${instance}" source="${STORAGE_POOL}/default_${instance}-disk"
-            else
-                lxc exec "${LEADER}" -- lxc storage create default "${STORAGE_DRIVER}" --target "${instance}"
+                opts="${opts} source=${STORAGE_POOL}/custom/default_${instance}-disk"
             fi
+
+            lxc exec "${LEADER}" -- lxc storage create default "${STORAGE_DRIVER}" --target "${instance}" ${opts}
         done
 
         lxc exec "${LEADER}" -- lxc storage create default "${STORAGE_DRIVER}"
         lxc exec "${LEADER}" -- lxc profile device add default root disk pool=default path=/
-
-        # Resize default storage.
-        if [ "${STORAGE_DRIVER}" != "dir" ]; then
-            for i in $(seq 1 "${CLUSTER_SIZE}"); do
-                instance="${INSTANCE}-${i}"
-                lxc exec "${LEADER}" -- lxc storage set default size 3GiB --target "${instance}"
-            done
-        fi
     fi
 
     # Create default managed network (lxdbr0).

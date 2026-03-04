@@ -22,8 +22,14 @@ jobs:
     name: Code
     runs-on: ubuntu-24.04
     steps:
+      - name: Get workflow target repository
+        id: workflow-info
+        run: echo "repository=$(echo "${{ github.workflow_ref }}" | cut -d'/' -f1,2)" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ steps.workflow-info.outputs.repository }}
 
       - name: Install Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0

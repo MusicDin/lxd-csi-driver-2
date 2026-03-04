@@ -18,7 +18,7 @@ defaults:
 
 jobs:
   code-tests:
-    if: ${{ github.event_name != 'schedule' || github.repository == 'canonical/lxd-csi-driver' }}
+    if: ${{ github.event_name != 'schedule' || github.repository_owner == 'canonical' }}
     name: Code
     runs-on: ubuntu-24.04
     steps:

@@ -40,9 +40,10 @@ func NewNodeServiceCapability(c csi.NodeServiceCapability_RPC_Type) *csi.NodeSer
 	}
 }
 
-// ValidateVolumeCapabilities validates the provided volume capabilities. Access modes that
-// the driver does not support are rejected.
-func ValidateVolumeCapabilities(volCaps ...*csi.VolumeCapability) error {
+// ValidateVolumeCapabilities validates the provided volume capabilities against the given
+// LXD storage driver. Multi-node access modes are accepted only for filesystem volumes on
+// a multi-node storage driver.
+func ValidateVolumeCapabilities(storageDriver string, volCaps ...*csi.VolumeCapability) error {
 	if len(volCaps) == 0 {
 		return errors.New("Request has no volume capabilities")
 	}
@@ -66,6 +67,21 @@ func ValidateVolumeCapabilities(volCaps ...*csi.VolumeCapability) error {
 		if c.GetMount() != nil {
 			accessTypeMount = true
 		}
+
+		if !isMultiNodeAccessMode(c) {
+			// The remaining checks restrict only multi-node access modes.
+			continue
+		}
+
+		mode := c.GetAccessMode().GetMode()
+
+		if c.GetBlock() != nil {
+			return fmt.Errorf("Access mode %q is not supported for block volumes", mode)
+		}
+
+		if !IsMultiNodeStorageDriver(storageDriver) {
+			return fmt.Errorf("Access mode %q is not supported by storage driver %q", mode, storageDriver)
+		}
 	}
 
 	if !accessTypeBlock && !accessTypeMount {
@@ -86,7 +102,10 @@ func isSupportedAccessMode(volCap *csi.VolumeCapability) bool {
 	case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
-		csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
+		csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+		csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
+		csi.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER,
+		csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
 		return true
 	default:
 		return false

@@ -70,6 +70,71 @@ func TestControllerPublishVolumeRejectsUnsupportedAccessMode(t *testing.T) {
 	require.ErrorContains(t, err, `Access mode "MULTI_NODE_MULTI_WRITER" is not supported`)
 }
 
+func TestControllerPublishVolumeReadonly(t *testing.T) {
+	tests := []struct {
+		Name           string
+		AccessMode     csi.VolumeCapability_AccessMode_Mode
+		Readonly       bool
+		expectReadonly string
+	}{
+		{
+			Name:           "Ensure single node writer volume is attached read-write",
+			AccessMode:     csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+			Readonly:       false,
+			expectReadonly: "",
+		},
+		{
+			Name:           "Ensure read-only publish request attaches volume read-only",
+			AccessMode:     csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+			Readonly:       true,
+			expectReadonly: "true",
+		},
+		{
+			Name:           "Ensure single node reader only volume is attached read-only",
+			AccessMode:     csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
+			Readonly:       false,
+			expectReadonly: "true",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			d := &Driver{
+				name:     "lxd.csi.canonical.com",
+				version:  "test",
+				endpoint: "unix:///csi/csi.sock",
+				nodeID:   "test-node",
+			}
+
+			var calledUpdate bool
+			d.devLXD = &devlxd.FakeServer{
+				GetInstFunc: func(name string) (*api.DevLXDInstance, string, error) {
+					return &api.DevLXDInstance{Name: name}, "test-etag", nil
+				},
+				UpdateInstFunc: func(name string, inst api.DevLXDInstancePut, ETag string) error {
+					calledUpdate = true
+					require.Equal(t, test.expectReadonly, inst.Devices["pvc-volume-name"]["readonly"])
+					return nil
+				},
+			}
+
+			controller := NewControllerServer(d)
+
+			req := &csi.ControllerPublishVolumeRequest{
+				VolumeId:         "pool/pvc-volume-name",
+				NodeId:           "test-node",
+				VolumeCapability: newVolumeCapability(test.AccessMode, false),
+				Readonly:         test.Readonly,
+			}
+
+			resp, err := controller.ControllerPublishVolume(context.Background(), req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.True(t, calledUpdate, "UpdateInstance should have been called")
+		})
+	}
+}
+
 func TestControllerExpandVolumePreservesConfig(t *testing.T) {
 	// Initialize driver and controller server
 	d := &Driver{

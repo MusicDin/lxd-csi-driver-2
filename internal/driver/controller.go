@@ -601,6 +601,11 @@ func (c *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		reqInst.Devices[volName]["path"] = filepath.Join(driverFileSystemMountPath, volName)
 	}
 
+	// Attach the volume as read-only if requested or if the access mode permits only reads.
+	if req.Readonly || isReadOnlyAccessMode(req.VolumeCapability) {
+		reqInst.Devices[volName]["readonly"] = "true"
+	}
+
 	err = client.UpdateInstance(req.NodeId, reqInst, etag)
 	if err != nil {
 		return nil, status.Errorf(lxderrors.ToGRPCCode(err), "ControllerPublishVolume: Failed to attach volume %q: %v", volName, err)

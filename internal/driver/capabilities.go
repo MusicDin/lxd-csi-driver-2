@@ -2,6 +2,7 @@ package driver
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 )
@@ -28,7 +29,8 @@ func NewNodeServiceCapability(c csi.NodeServiceCapability_RPC_Type) *csi.NodeSer
 	}
 }
 
-// ValidateVolumeCapabilities validates the provided volume capabilities.
+// ValidateVolumeCapabilities validates the provided volume capabilities. Access modes that
+// allow attaching a volume to multiple nodes at once are rejected.
 func ValidateVolumeCapabilities(volCaps ...*csi.VolumeCapability) error {
 	if len(volCaps) == 0 {
 		return errors.New("Request has no volume capabilities")
@@ -44,6 +46,10 @@ func ValidateVolumeCapabilities(volCaps ...*csi.VolumeCapability) error {
 
 		if c.GetMount() != nil {
 			accessTypeMount = true
+		}
+
+		if isMultiNodeAccessMode(c) {
+			return fmt.Errorf("Access mode %q is not supported", c.GetAccessMode().GetMode())
 		}
 	}
 

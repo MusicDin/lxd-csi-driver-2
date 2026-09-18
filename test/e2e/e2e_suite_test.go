@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -12,8 +13,10 @@ import (
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 
+	"github.com/canonical/lxd-csi-driver/internal/driver"
 	"github.com/canonical/lxd-csi-driver/test/e2e/specs"
 	"github.com/canonical/lxd-csi-driver/test/testutils"
 	lxd "github.com/canonical/lxd/client"
@@ -86,6 +89,41 @@ func requiresResizableBlockVolumes(storageDriver string) {
 	case "cephfs":
 		ginkgo.Skip("SKIP: Driver cephfs does not support block volumes")
 	}
+}
+
+// requiresMultiNodeVolumes skips the test when the given LXD storage driver does not
+// support attaching a volume to multiple nodes at once.
+func requiresMultiNodeVolumes(storageDriver string) {
+	if !driver.IsMultiNodeStorageDriver(storageDriver) {
+		ginkgo.Skip("SKIP: Driver " + storageDriver + " does not support multi-node volumes")
+	}
+}
+
+// requiresSingleNodeVolumes skips the test when the given LXD storage driver
+// supports attaching a volume to multiple nodes at once.
+func requiresSingleNodeVolumes(storageDriver string) {
+	if driver.IsMultiNodeStorageDriver(storageDriver) {
+		ginkgo.Skip("SKIP: Driver " + storageDriver + " supports multi-node volumes")
+	}
+}
+
+// getKubernetesNodes returns the hostnames of the Kubernetes nodes, as set in the
+// node label "kubernetes.io/hostname". The test is skipped when the cluster has
+// fewer nodes than required.
+func getKubernetesNodes(ctx context.Context, cfg *rest.Config, required int) []string {
+	nodes, err := testutils.GetKubernetesClient(cfg).CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to list Kubernetes nodes")
+
+	hostnames := make([]string, 0, len(nodes.Items))
+	for _, node := range nodes.Items {
+		hostnames = append(hostnames, node.Labels[corev1.LabelHostname])
+	}
+
+	if len(hostnames) < required {
+		ginkgo.Skip("SKIP: Test requires at least " + strconv.Itoa(required) + " Kubernetes nodes")
+	}
+
+	return hostnames
 }
 
 // getTestLXDStorageDrivers returns the list of LXD storage drivers to be used for testing.

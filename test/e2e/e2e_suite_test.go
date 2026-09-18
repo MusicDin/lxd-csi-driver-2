@@ -616,6 +616,8 @@ var _ = ginkgo.DescribeTableSubtree("[Volume access mode] ", func(driver string)
 	} {
 		ginkgo.It("Reject volume with access mode "+string(mode.accessMode),
 			func(ctx ginkgo.SpecContext) {
+				requiresSingleNodeVolumes(driver)
+
 				poolName, cleanup := getTestLXDStoragePool(driver)
 				defer cleanup()
 

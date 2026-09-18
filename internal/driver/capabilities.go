@@ -40,6 +40,10 @@ func ValidateVolumeCapabilities(volCaps ...*csi.VolumeCapability) error {
 	accessTypeMount := false
 
 	for _, c := range volCaps {
+		if c == nil {
+			return errors.New("VolumeCapability cannot be nil")
+		}
+
 		if c.GetBlock() != nil {
 			accessTypeBlock = true
 		}

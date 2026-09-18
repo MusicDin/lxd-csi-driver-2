@@ -71,9 +71,9 @@ func (n *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	}
 
 	// Mount options for the bind mount.
-	// If the volume is read-only, add "ro" option as well.
+	// If the volume is read-only or its access mode permits only reads, add "ro" option as well.
 	mountOptions := []string{"bind"}
-	if req.Readonly {
+	if req.Readonly || isReadOnlyAccessMode(req.VolumeCapability) {
 		mountOptions = append(mountOptions, "ro")
 	}
 

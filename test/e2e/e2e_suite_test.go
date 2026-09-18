@@ -127,12 +127,27 @@ func getTestLXDStoragePool(driver string) (poolName string, cleanup func()) {
 
 	config := make(map[string]string)
 	if driver != "dir" {
-		config["size"] = "512MiB"
 		config["volume.size"] = "128MiB"
+	}
+
+	// Pool size is not configurable for dir and cephfs pools.
+	if driver != "dir" && driver != "cephfs" {
+		config["size"] = "512MiB"
 	}
 
 	if driver == "lvm" {
 		config["lvm.use_thinpool"] = "false"
+	}
+
+	if driver == "cephfs" {
+		// Use a dedicated directory within the CephFS file system for each pool.
+		// The file system name is read from the TEST_LXD_CEPHFS environment variable.
+		fsName := os.Getenv("TEST_LXD_CEPHFS")
+		if fsName == "" {
+			fsName = "cephfs"
+		}
+
+		config["cephfs.path"] = fsName + "/" + poolName
 	}
 
 	req := api.StoragePoolsPost{

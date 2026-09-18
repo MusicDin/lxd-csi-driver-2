@@ -58,6 +58,19 @@ func ValidateVolumeCapabilities(volCaps ...*csi.VolumeCapability) error {
 	return nil
 }
 
+// isMultiNodeAccessMode reports whether the access mode of the given VolumeCapability
+// allows the volume to be attached to multiple nodes at once.
+func isMultiNodeAccessMode(volCap *csi.VolumeCapability) bool {
+	switch volCap.GetAccessMode().GetMode() {
+	case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
+		csi.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER,
+		csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
+		return true
+	default:
+		return false
+	}
+}
+
 // ParseContentType parses the content type from the given VolumeCapability array.
 func ParseContentType(volCaps ...*csi.VolumeCapability) string {
 	for _, c := range volCaps {
